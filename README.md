@@ -1,48 +1,45 @@
 # ForecastInfluence
 
-Observation-influence studies for forecasting, with explicit interventions,
-horizon-resolved results, and numerical reference checks.
+Measure how individual training observations affect time-series forecasts.
 
-**Version 1.0.0.** A local, typed research package by **Malek Itani**, licensed
-under MIT for anyone to use. Verified with **442 passing tests and 96.88% coverage**,
-including the complete tests and 12 examples against a clean installed wheel.
-Source code is available at [github.com/Ma-Mar-Itan/ForecastInfluence](https://github.com/Ma-Mar-Itan/ForecastInfluence).
-No PyPI package upload or hosted documentation site is claimed. See the
-[v1 handoff](docs/project/handoff_v100.md) and [release checklist](docs/project/release_checklist_v100.md).
+ForecastInfluence is a Python library for observation-level and case-level influence
+analysis in forecasting pipelines. It supports local case-weight derivatives, exact
+refit effects, raw-value interventions, rolling forecast origins, and labeled results
+across forecast horizons.
 
-## What it answers
+Use it to:
 
-- Which training cases most change a particular forecast horizon or path?
-- What changes when a recorded value is corrected, including its later uses as a lag?
-- How closely does a local approximation agree with numerical refitting?
+- rank the training cases that most affect a forecast;
+- test the effect of deleting, downweighting, or correcting observations;
+- compare first-order influence approximations with full refits; and
+- trace effects through lagged features and recursive forecasts.
 
-These questions require a declared unit, intervention, target and replay policy.
-The package keeps those choices in each result, alongside source membership,
-model specifications, numerical diagnostics and labeled output dimensions. It
-does not automatically identify bad data: a large effect can reflect useful
-information, a regime change, a measurement problem, or an unstable fitted model.
+Influence is diagnostic. A large value can indicate an unusual observation, a regime
+change, model instability, or useful information; it does not establish causality or
+prove that an observation is erroneous.
 
-## Install from this checkout
+## Installation
+
+Install version 1.0.0 directly from GitHub:
 
 ```bash
-python -m pip install -e .
+python -m pip install "forecastinfluence @ git+https://github.com/Ma-Mar-Itan/forecastinfluence.git@v1.0.0"
 ```
 
-For sparse/Huber models add `python -m pip install -e ".[models]"`; for plotting
-add `python -m pip install -e ".[plots]"`. Base imports require
-NumPy, pandas and xarray; Matplotlib is loaded only when plotting is requested.
-No model download, service account or network dataset is needed by the examples.
-The declared Python minimum is 3.11. The examples were executed locally with
-Python 3.12 on Windows; the checked-in CI matrix covers Python 3.11, 3.12 and 3.13 on
-Linux, Windows and macOS, but its presence is not evidence of completed remote runs.
+Optional dependencies are available for additional models and plotting:
 
-## A complete study
+```bash
+python -m pip install "forecastinfluence[models,plots] @ git+https://github.com/Ma-Mar-Itan/forecastinfluence.git@v1.0.0"
+```
 
-This deterministic AR(1) example fits a ridge model with two lag features and
-recursively forecasts horizons 1, 3 and 6. Each of the final three training cases
-is a separate intervention. The local result differentiates an absolute case
-weight at one; the finite result sets that weight to zero and refits with the
-original denominator. The explicit conversion makes their units comparable.
+ForecastInfluence requires Python 3.11 or later. The base installation uses NumPy,
+pandas, and xarray.
+
+## Quick start
+
+The example below fits a recursive ridge forecast, measures local influence for the
+last three training cases, computes their exact deletion effects, and compares the
+first-order approximation with the refitted result.
 
 <!-- BEGIN QUICKSTART -->
 ```python
@@ -82,28 +79,16 @@ assert np.isfinite(deletion.effect.values).all()
 ```
 <!-- END QUICKSTART -->
 
-This block is synchronized with [examples/quickstart.py](examples/quickstart.py).
-The baseline forecast at horizon 3 is approximately `0.047816`. For this seed,
-deleting the last case lowers it by approximately `0.004374`. These are synthetic
-demonstration values, not expected behavior for another dataset. A ranking keeps
-the signed effect and status while sorting by magnitude by default. Specify
-every varying non-source axis before ranking; use an explicit reduction when
-you intend to combine horizons or origins.
+`local` contains the derivative of each forecast with respect to a case weight.
+`deletion` contains the exact change after setting that weight to zero and refitting.
+The result arrays preserve the source, forecast origin, horizon, and target labels.
 
-![Selected training case weight derivatives over forecast horizons for synthetic ridge forecasts](docs/assets/influence-profile.png)
+![Case-weight influence across forecast horizons on a synthetic series](docs/assets/influence-profile.png)
 
-*Native ridge (`penalty=0.05`, lags 1, 2 and 24) recursive forecasts on synthetic
-data with seed 7. The figure shows one case's local weight derivative, in forecast
-series units per absolute case-weight unit.
-Regenerate it with `python scripts/generate_example_assets.py`.*
+*Case-weight derivatives across forecast horizons for a synthetic ridge forecast.
+The figure can be regenerated with `python scripts/generate_example_assets.py`.*
 
-## Supported computations
-
-The executable capability declarations generate this table. All rows below are
-implemented scalar capabilities. Implicit derivatives apply to native OLS/ridge;
-LASSO, elastic net, Huber and replay pipelines use numerical methods. The standard
-scalar targets are the
-forecast-value, supplied squared-error and parameter-value targets.
+## Supported analysis
 
 <!-- BEGIN CAPABILITIES -->
 | Source unit | Quantity | Engine |
@@ -115,93 +100,56 @@ forecast-value, supplied squared-error and parameter-value targets.
 | observation | Finite after-minus-before effect | `refit` |
 <!-- END CAPABILITIES -->
 
-Typed groups apply their member changes simultaneously. Raw edits rebuild all
-training occurrences and, by default, the forecast context. Rolling studies use
-explicit origins and exact raw observation windows. Results retain separate
-source, origin, horizon and target axes; coefficient results use model and
-parameter axes instead. Results can be exported as JSON plus numeric NPZ without
-pickling models or embedding the original raw series.
+The library includes:
 
-Additional implemented workflows:
+- direct and recursive univariate forecasting;
+- rolling-origin studies and explicit raw-observation windows;
+- OLS, ridge, LASSO, elastic net, and fixed-scale Huber regression;
+- multivariate direct and recursive VAR forecasts;
+- raw-value edits, case deletion, observation deletion, and grouped interventions;
+- exogenous lagged features and declared baseline-weight rules;
+- frozen or recomputed preprocessing and chronological model selection;
+- forecast, parameter, squared-error, and interval targets; and
+- JSON/NPZ result export without serializing fitted models or source data.
 
-- **Sparse and robust models:** LASSO, elastic net and fixed-scale Huber; explicit
-  objective normalization, solver diagnostics, selected features and support paths.
-- **Deletion and roles:** physical case removal versus raw exclusion with a declared
-  missingness policy; additive local response/lag/context derivative paths.
-- **Pipeline replay:** frozen or recomputed standard/robust feature scaling and
-  deterministic chronological regularization grids, with candidate-switch records.
-- **Vector forecasts:** direct/recursive VAR and rolling multivariate studies retain
-  source, origin, horizon and target labels; joint case weights and raw-cell edits.
-- **Uncertainty:** explicitly conditional Gaussian innovation plug-in interval
-  components and their numerical influence. Parameter uncertainty is excluded.
-- **Research:** paired synthetic contamination, A–G experiments, matched magnitude
-  and rank diagnostics, anomaly-score alignment, group interactions and timed grids.
+See the [API reference](docs/reference/api.md) for the public interfaces and the
+[status page](docs/project/status.md) for current boundaries.
 
-Read the [v1 API](docs/reference/v100.md), [migration guide](docs/project/migration_v010_to_v100.md),
-[sparse guide](docs/guides/sparse_models.md), and [pipeline guide](docs/guides/pipeline_replay.md).
-Neural/quantile models, ARIMA/state-space adapters, exogenous inputs, smooth sparse
-implicit derivatives and dependence-robust interval calibration are deferred.
-Retuning after physical row deletion is rejected until frozen fold identities are
-supported; zero weights or fixed tuning remain available. Interval assumptions and
-other boundaries are explicit in the [status page](docs/project/status.md).
+## Interpreting results
 
-## Interpret an effect precisely
+Finite effects use **after minus before**. A positive forecast effect means that the
+intervention increased the forecast. A local derivative is a slope at the fitted
+model, so it should not be interpreted as the exact effect of deleting a case.
 
-Finite effects always mean **after minus before**. Positive forecast effect means
-the intervention raised the forecast. Positive `SquaredError` effect means it
-increased the full squared error against the separately supplied, fixed truth.
-The training objective instead uses half squared error. A positive upweighting
-derivative has a different intervention direction from deletion.
+Case reweighting and raw-value editing answer different questions. Reweighting changes
+a fitting case while preserving the recorded series. Editing a raw observation can
+also change later lagged predictors and the forecast context. ForecastInfluence keeps
+the intervention, source unit, replay policy, and numerical diagnostics with each
+result so that these choices remain explicit.
 
-The intercept-only example `[1, 2, 4]` makes the distinction concrete. Its mean is
-`7/3`; the final case's upweighting derivative is `5/9`. Deleting that case changes
-the mean by `-5/6`, while its first-order prediction is `-5/9`. A derivative is a
-local slope, not an exact finite-deletion formula. Validate local derivatives
-with small central differences, then assess finite approximations separately.
+For more detail, read:
 
-A recorded value may appear as a response, in several later lagged predictors,
-and in the forecast context. Editing it is therefore a different experiment from
-zeroing one fitting case's weight. Case reweighting preserves the original raw
-history. Neither experiment establishes a causal effect, a statistical confidence
-interval, or a universally harmful observation.
+- [Statistical conventions](docs/explanations/statistical-contract.md)
+- [Temporal and numerical behavior](docs/explanations/temporal-and-numerical.md)
+- [Intervention tutorial](docs/tutorials/interventions.md)
+- [Rolling and validation tutorial](docs/tutorials/rolling-and-validation.md)
+- [Examples](docs/examples/gallery.md)
 
-OLS refuses numerically nonunique fits; ridge leaves its intercept unpenalized.
-Both retain the baseline loss denominator and expose conditioning and residual
-diagnostics. There is no hidden damping or pseudoinverse rescue. Small-step
-agreement does not guarantee accurate large deletions, and near-unstable recursive
-models can amplify perturbations. Missing and failed entries carry NaN and status
-labels; verified dependency exclusions can be structural zeros.
-
-See [statistical meaning](docs/explanations/statistical-contract.md),
-[temporal dependencies](docs/explanations/temporal-and-numerical.md), and
-[practical workflows](docs/tutorials/interventions.md) for the full conventions.
-
-## Documentation and development
-
-Start with the [documentation home](docs/index.md),
-[executable gallery](docs/examples/gallery.md), or
-[API reference](docs/reference/api.md). There is no published documentation URL.
-From the checkout:
+## Development
 
 ```bash
-python -m pip install -e ".[dev,docs,plots,models]"
+git clone https://github.com/Ma-Mar-Itan/forecastinfluence.git
+cd forecastinfluence
+python -m pip install -e ".[dev,docs,models,plots]"
 python scripts/check_readme_examples.py --run
 python -m pytest
 python -m mkdocs build --strict
-python scripts/check_release.py
 ```
 
-The full release check includes formatting, linting, typing, tests, coverage,
-strict documentation, distribution validation and the complete test suite and examples against a clean installed wheel
-outside the source tree. The [contributor guide](docs/contributing/development.md)
-explains the module boundaries, numerical-oracle expectations and adapter contract.
+Contributions should include deterministic tests for numerical behavior. See the
+[contributor guide](CONTRIBUTING.md) and [development guide](docs/contributing/development.md).
 
-Influence functions, prediction attribution, group-effect analysis and temporal
-attribution have substantial prior work. The [source-grounded comparison](docs/research/related-work.md)
-includes Koh and Liang, TimeInf, case-weight LASSO paths, pyDVL and Captum. This
-implementation combines explicit forecasting contracts and reference checks; it
-does not claim that the underlying differentiation is new. See the
-[claims register](docs/research/novelty-claims.md) before making research claims.
-Author: **Malek Itani**. The library is available under the [MIT License](LICENSE).
-See [CITATION.cff](CITATION.cff) for software citation metadata. No DOI or public
-package release is claimed.
+## License and citation
+
+ForecastInfluence is available under the [MIT License](LICENSE). Citation metadata is
+provided in [CITATION.cff](CITATION.cff).
