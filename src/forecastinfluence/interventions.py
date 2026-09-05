@@ -188,6 +188,22 @@ class ReplaceValues:
 
 
 @dataclass(frozen=True)
+class ShiftCaseWeights:
+    """Internal: add a finite delta to each selected case's baseline weight.
+
+    Central differences use this so a symmetric step is taken around the
+    declared baseline rather than around an assumed weight of one. It is not a
+    requestable capability; use SetCaseWeight for finite absolute changes.
+    """
+
+    delta: float
+
+    def __post_init__(self) -> None:
+        if not np.isfinite(self.delta):
+            raise ForecastInfluenceError("Case-weight shift must be finite.")
+
+
+@dataclass(frozen=True)
 class DeleteCases:
     """Physically remove selected training rows while retaining baseline n0."""
 
@@ -208,5 +224,12 @@ class DeleteObservations:
             raise ForecastInfluenceError("missing_policy must be error or drop_affected_rows.")
 
 
-Change = SetCaseWeight | AddToValues | ReplaceValues | DeleteCases | DeleteObservations
+Change = (
+    SetCaseWeight
+    | AddToValues
+    | ReplaceValues
+    | DeleteCases
+    | DeleteObservations
+    | ShiftCaseWeights
+)
 Coordinate = CaseWeight | RawValue

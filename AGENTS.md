@@ -1,6 +1,7 @@
 # ForecastInfluence contributor instructions
 
-Read STATISTICAL_CONTRACT.md before changing mathematical behavior. It controls
+Read docs/explanations/statistical-contract.md before changing mathematical behavior
+(long-form original: docs/project/archive/STATISTICAL_CONTRACT.md). It controls
 source units, signs, fixed baseline n0, intercept treatment and temporal eligibility.
 Use src modules according to docs/project/decisions/0001-contracts.md. Keep optional
 plotting/experiments outside core imports. Do not silently regularize, impute,

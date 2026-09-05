@@ -8,6 +8,7 @@ import numpy as np
 import xarray as xr
 
 from .core import FloatArray, ForecastInfluenceError, UnsupportedCapabilityError
+from .features import LagFeatures
 from .forecasting import FittedForecaster
 from .models import FittedLinearModel
 
@@ -36,14 +37,18 @@ def forecast_intervals(
     if fitted.strategy.kind == "direct":
         variance = np.array([variances[h] for h in fitted.horizons])
     else:
+        if not isinstance(fitted.strategy.features, LagFeatures):
+            raise UnsupportedCapabilityError(
+                "Recursive innovation variance uses the fitted AR impulse response and is defined "
+                "for LagFeatures only; use a direct strategy for other builders."
+            )
+        lags = fitted.strategy.features.lags
         impulse = [1.0]
         for j in range(1, max(fitted.horizons)):
             impulse.append(
                 sum(
                     slope * impulse[j - lag]
-                    for slope, lag in zip(
-                        fitted.models[1].coefficients, fitted.strategy.features.lags, strict=True
-                    )
+                    for slope, lag in zip(fitted.models[1].coefficients, lags, strict=True)
                     if j >= lag
                 )
             )

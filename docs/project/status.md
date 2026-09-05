@@ -7,6 +7,8 @@ upload, hosted docs, DOI or remote CI execution is claimed.
 |---|---|
 | Canonical models | Native OLS/ridge; sklearn LASSO/elastic net; fixed-delta Huber via SciPy; unpenalized intercept, fixed n0 |
 | Temporal studies | Direct/recursive scalar and VAR; explicit rolling/expanding windows and eligibility masks |
+| Designs | Target lags; target lags plus declared exogenous columns on the same grid, with per-series provenance |
+| Baseline weights | Unit weights, or a declared rule such as normalized exponential decay, reapplied in every replay |
 | Interventions | Case weights, physical case deletion, raw Add/Replace, raw exclusion of dependent rows, explicit groups |
 | Local computations | Native case implicit derivatives, numerical central differences, native raw response/lag/context chain rule |
 | Targets | Forecast, fixed retrospective squared loss, parameters; separate finite selection estimand; conditional interval components |
@@ -27,6 +29,18 @@ smooth active-set implicit derivatives are deferred. Central differences warn wh
 support changes. Retuned candidate switches refuse a smooth derivative claim.
 Retuning after physical row deletion is explicitly rejected until fold identities
 are maintained; fixed tuning and zero case weights remain supported.
+
+Exogenous designs require a direct strategy: recursive forecasting beyond one
+step would need predictor values dated after the last observation, which the
+builder refuses to invent. Excluding an exogenous cell with DeleteObservations
+is refused because its dependent-row and forecast-context semantics are not yet
+declared; value edits are supported. Role decomposition and recursive innovation
+intervals name one path per lag occurrence and stay defined for LagFeatures only.
+
+Declared baseline weights cover case-weight derivatives, finite case changes and
+raw edits. Weight arrays supplied directly to a forecaster still refuse influence,
+because replay cannot reconstruct an ad-hoc vector on an edited design. Role
+decomposition and multivariate VAR studies still require unit baseline weights.
 
 Multivariate numerical effects use joint training rows and original raw cells.
 Multivariate implicit derivatives, equation-specific case weights, loss/parameter/

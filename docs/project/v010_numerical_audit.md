@@ -1,7 +1,7 @@
 # Independent v0.1 numerical and temporal audit
 
 Audit date: 2026-09-05. This review precedes all v1 feature implementation.
-It follows the new upgrade request, `AGENTS.md`, and `STATISTICAL_CONTRACT.md`.
+It follows the new upgrade request, `AGENTS.md`, and the statistical contract (now `docs/project/archive/STATISTICAL_CONTRACT.md`).
 The reviewer owns only `tests/test_v010_audit.py` and this report; production
 corrections belong to the main integration workstream.
 

@@ -1,6 +1,8 @@
 site_name: ForecastInfluence
 site_description: Explicit intervention studies for forecasting
 strict: true
+exclude_docs: |
+  project/archive/
 theme:
   name: material
   font: false
@@ -44,6 +46,8 @@ nav:
       - Cases, raw edits and groups: tutorials/interventions.md
       - Rolling studies and validation: tutorials/rolling-and-validation.md
   - How-to:
+      - Exogenous predictors: guides/exogenous_features.md
+      - Declared baseline weights: guides/baseline_weights.md
       - Sparse models and selection: guides/sparse_models.md
       - Robust regression: guides/robust_models.md
       - Pipeline replay and tuning: guides/pipeline_replay.md
@@ -71,17 +75,19 @@ nav:
       - Claims register: research/novelty-claims.md
   - Contributing: contributing/development.md
   - Project:
+      - Status: project/status.md
       - v1 release checklist: project/release_checklist_v100.md
       - v1 handoff: project/handoff_v100.md
       - v1 architecture: project/v100_architecture.md
-      - Migration: project/migration_v010_to_v100.md
-      - Independent v0.1 audit: project/v010_audit.md
-      - v0.1 numerical audit: project/v010_numerical_audit.md
       - Independent v1 review: project/v100_numerical_review.md
-      - Status: project/status.md
-      - Implementation handoff: project/handoff.md
+      - Migration from v0.1: project/migration_v010_to_v100.md
       - Verification evidence: project/verification.md
-      - Implementation plan: project/implementation-plan.md
-      - Numerical review: project/numerical-review.md
-      - Shared contracts: project/decisions/0001-contracts.md
-      - Environment and release: project/decisions/0002-environment-and-release.md
+      - Decisions:
+          - Shared contracts: project/decisions/0001-contracts.md
+          - Environment and release: project/decisions/0002-environment-and-release.md
+      - History (v0.1):
+          - Independent v0.1 audit: project/v010_audit.md
+          - v0.1 numerical audit: project/v010_numerical_audit.md
+          - v0.1 implementation handoff: project/handoff.md
+          - v0.1 implementation plan: project/implementation-plan.md
+          - v0.1 numerical review: project/numerical-review.md

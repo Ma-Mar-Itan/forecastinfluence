@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 
 from .core import ForecastInfluenceError, UnsupportedCapabilityError
+from .features import LagFeatures
 from .forecasting import DirectForecaster, FittedForecaster
 from .interventions import SourceSelection
 from .models import FittedLinearModel
@@ -20,6 +21,11 @@ def raw_role_decomposition(fitted: FittedForecaster, sources: SourceSelection) -
     """
     if sources.unit != "observation" or not fitted.baseline_is_unit:
         raise ForecastInfluenceError("Use raw observation sources and unit baseline weights.")
+    if not isinstance(fitted.strategy.features, LagFeatures):
+        raise UnsupportedCapabilityError(
+            "Role decomposition names one path per lag occurrence and is defined for LagFeatures "
+            "only; use numerical raw effects for other builders."
+        )
     if not all(isinstance(m, FittedLinearModel) for m in fitted.models.values()):
         raise UnsupportedCapabilityError(
             "Role derivatives currently require native OLS/ridge with fixed preprocessing."
@@ -115,7 +121,7 @@ def recursive_parameter_paths(fitted: FittedForecaster, dtheta: Any) -> xr.Datas
     values = list(fitted.data.values)
     injection = {}
     for h in range(1, max(fitted.horizons) + 1):
-        row = [values[len(values) - lag] for lag in fitted.strategy.features.lags]
+        row = fitted.strategy.features.context_row(values, step=h, data=fitted.data)
         augmented = np.array(([1.0] if model.objective.fit_intercept else []) + row)
         injection[h] = augmented @ direction
         values.append(float(model.predict(np.array(row).reshape(1, -1))[0]))

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from numbers import Integral
 from types import MappingProxyType
 from typing import Any
@@ -18,7 +18,8 @@ from .core import (
     UnsupportedCapabilityError,
 )
 from .data import SeriesData
-from .features import DesignMatrix, LagFeatures
+from .features import DesignMatrix, FeatureBuilder, MultiSeriesBuilder
+from .weights import BaselineWeights, UnitWeights, validate_baseline
 
 
 def _horizons(values: Iterable[int]) -> tuple[int, ...]:
@@ -45,12 +46,16 @@ class DirectForecaster:
     ----------
     regressor : RegressorProtocol
         Weighted estimator implementing the canonical fixed-n0 objective.
-    features : LagFeatures
-        Lag features relative to case issue time, shared across horizons.
+    features : FeatureBuilder
+        Design builder relative to case issue time, shared across horizons.
+    baseline_weights : BaselineWeights, default UnitWeights()
+        Declared baseline fitting weights. Influence is defined relative to
+        this rule, which is reapplied identically during every replay.
     """
 
     regressor: RegressorProtocol
-    features: LagFeatures
+    features: FeatureBuilder
+    baseline_weights: BaselineWeights = UnitWeights()
 
     @property
     def kind(self) -> str:
@@ -74,10 +79,14 @@ class RecursiveForecaster:
 
     The stored model key is always 1, even if output horizons omit one. Every
     intermediate prediction through the largest requested horizon is computed.
+
+    ``baseline_weights`` declares the baseline fitting weights; influence is
+    defined relative to that rule.
     """
 
     regressor: RegressorProtocol
-    features: LagFeatures
+    features: FeatureBuilder
+    baseline_weights: BaselineWeights = UnitWeights()
 
     @property
     def kind(self) -> str:
@@ -99,9 +108,19 @@ def _fit(
 ) -> FittedForecaster:
     data = SeriesData.from_series(data)
     validated_horizons = _horizons(horizons)
-    if not isinstance(strategy.features, LagFeatures):
+    if not isinstance(strategy.features, FeatureBuilder):
         raise UnsupportedCapabilityError(
-            "v0.1 supports LagFeatures; other feature builders require an adapter."
+            "Feature builders must implement build, feature_names, min_history, "
+            "context_row and target_positions; see docs/how-to/custom-adapters.md."
+        )
+    if (
+        isinstance(strategy, RecursiveForecaster)
+        and isinstance(strategy.features, MultiSeriesBuilder)
+        and max(validated_horizons) > 1
+    ):
+        raise UnsupportedCapabilityError(
+            "Recursive forecasting beyond one step would need exogenous values later than the "
+            "last observation; use DirectForecaster with exogenous features."
         )
     model_keys = validated_horizons if isinstance(strategy, DirectForecaster) else (1,)
     if weights is None:
@@ -110,23 +129,34 @@ def _fit(
         raise ForecastInfluenceError(
             f"weights must map fitted model keys {model_keys} to case-weight arrays."
         )
-    models, designs = {}, {}
+    declared = getattr(strategy, "baseline_weights", None) or UnitWeights()
+    models, designs, resolved = {}, {}, {}
     for key in model_keys:
         design = strategy.features.build(data, key)
         designs[key] = design
+        n_cases = len(design.case_ids)
+        supplied = weights.get(key)
+        baseline = (
+            validate_baseline(np.asarray(supplied, dtype=float), n_cases)
+            if supplied is not None
+            else validate_baseline(declared.for_cases(n_cases, offset=int(key)), n_cases)
+        )
+        resolved[key] = baseline
+        # Unit vectors are passed as None so the default path stays byte-identical.
+        passed = None if bool(np.all(baseline == 1)) else baseline
         if hasattr(strategy.regressor, "fit_design"):
-            models[key] = strategy.regressor.fit_design(design, weights=weights.get(key))
+            models[key] = strategy.regressor.fit_design(design, weights=passed)
             continue
         models[key] = strategy.regressor.fit(
             design.X,
             design.y,
-            weights=weights.get(key),
+            weights=passed,
             n0=design.n0,
             feature_names=design.feature_names,
         )
-    baseline_is_unit = all(
-        np.all(np.asarray(value, dtype=float) == 1) for value in weights.values()
-    )
+    baseline_is_unit = all(bool(np.all(value == 1)) for value in resolved.values())
+    # Weights supplied directly bypass the declared rule, so no rule is recorded
+    # and influence engines refuse the fit unless those weights were all one.
     return FittedForecaster(
         data,
         validated_horizons,
@@ -134,6 +164,8 @@ def _fit(
         MappingProxyType(designs),
         strategy,
         bool(baseline_is_unit),
+        None if weights else declared,
+        MappingProxyType({key: value for key, value in resolved.items()}),
     )
 
 
@@ -144,10 +176,12 @@ class FittedForecaster:
     ``models`` and ``designs`` return fresh dictionaries. ``strategy`` retains
     the estimator configuration so numerical engines can replay an edited
     history using ``strategy.fit`` without mutating this baseline.
-    ``baseline_is_unit`` records whether every supplied fitting weight was one;
-    influence engines require this canonical baseline. Direct construction
-    defaults to True and therefore asserts that the supplied models used unit
-    weights; use strategy.fit for checked construction.
+    ``baseline_is_unit`` records whether every baseline fitting weight was one.
+    ``baseline_spec`` records the declared weighting rule that produced them, and
+    is None when weights were supplied directly rather than declared. Influence
+    engines require either unit weights or a declared rule, so that every replay
+    can reconstruct the same baseline. Direct construction defaults to unit
+    weights with no rule; use strategy.fit for checked construction.
     """
 
     data: SeriesData
@@ -156,6 +190,21 @@ class FittedForecaster:
     _designs: Mapping[int, DesignMatrix]
     strategy: DirectForecaster | RecursiveForecaster
     baseline_is_unit: bool = True
+    baseline_spec: BaselineWeights | None = None
+    _baseline_weights: Mapping[int, Any] = field(default_factory=lambda: MappingProxyType({}))
+
+    def baseline_case_weights(self, key: int, n_cases: int) -> np.ndarray:
+        """Return the declared baseline weights for one model and case count.
+
+        Replay uses this so a perturbation starts from the same baseline the
+        study was fitted at, rather than from an assumed vector of ones.
+        """
+        stored = self._baseline_weights.get(key)
+        if stored is not None and len(stored) == n_cases:
+            return np.array(stored, dtype=float)
+        if self.baseline_spec is None:
+            return np.ones(n_cases)
+        return validate_baseline(self.baseline_spec.for_cases(n_cases, offset=int(key)), n_cases)
 
     @property
     def models(self) -> dict[int, Any]:
@@ -173,7 +222,7 @@ class FittedForecaster:
             raise ForecastInfluenceError(
                 "Forecast context must preserve the baseline time grid, origin and target name."
             )
-        if self.strategy.features.lags and max(self.strategy.features.lags) > len(context):
+        if self.strategy.features.min_history > len(context):
             raise ForecastInfluenceError("Forecast context lacks the full requested lag history.")
         return context
 
@@ -197,14 +246,19 @@ class FittedForecaster:
         """
         data = self._context(context)
         values = list(data.values)
-        lags = self.strategy.features.lags
+        features = self.strategy.features
         if isinstance(self.strategy, DirectForecaster):
-            row = [values[len(data) - lag] for lag in lags]
-            return np.asarray([self._predict(self._models[h], row) for h in self.horizons])
+            return np.asarray(
+                [
+                    self._predict(self._models[h], features.context_row(values, step=h, data=data))
+                    for h in self.horizons
+                ]
+            )
         predictions = {}
         for horizon in range(1, max(self.horizons) + 1):
-            row = [values[len(values) - lag] for lag in lags]
-            predicted = self._predict(self._models[1], row)
+            predicted = self._predict(
+                self._models[1], features.context_row(values, step=horizon, data=data)
+            )
             values.append(predicted)
             predictions[horizon] = predicted
         return np.asarray([predictions[h] for h in self.horizons])
@@ -234,16 +288,17 @@ class FittedForecaster:
         if dtheta.ndim != 2 or dtheta.shape[0] != len(parameters) or not np.isfinite(dtheta).all():
             raise ForecastInfluenceError("dtheta must be a finite (parameter, source) matrix.")
         data = self._context(context)
-        lags = self.strategy.features.lags
+        features = self.strategy.features
         intercept = int(model.objective.fit_intercept)
-        if len(parameters) != len(lags) + intercept:
+        if len(parameters) != len(features.feature_names) + intercept:
             raise UnsupportedCapabilityError(
-                "Sensitivity requires intercept-then-lag linear parameters; use numerical replay."
+                "Sensitivity requires intercept-then-feature linear parameters; use numerical replay."
             )
         values = list(data.values)
         if isinstance(self.strategy, DirectForecaster):
             direct_row = np.asarray(
-                ([1.0] if intercept else []) + [values[len(data) - lag] for lag in lags]
+                ([1.0] if intercept else [])
+                + features.context_row(values, step=model_key, data=data)
             )
             answer = np.zeros((len(self.horizons), dtheta.shape[1]))
             answer[self.horizons.index(model_key)] = direct_row @ dtheta
@@ -252,12 +307,14 @@ class FittedForecaster:
         by_horizon = {}
         slopes = parameters[intercept:]
         for horizon in range(1, max(self.horizons) + 1):
-            positions = [len(values) - lag for lag in lags]
-            row = [values[position] for position in positions]
+            positions = features.target_positions(len(values), step=horizon)
+            row = features.context_row(values, step=horizon, data=data)
             augmented = np.asarray(([1.0] if intercept else []) + row)
             derivative = augmented @ dtheta
             for slope, position in zip(slopes, positions, strict=True):
-                derivative = derivative + slope * derivatives[position]
+                # A column reading no forecast-target cell contributes no recursion.
+                if position is not None:
+                    derivative = derivative + slope * derivatives[position]
             predicted = self._predict(model, row)
             if not np.isfinite(derivative).all():
                 raise NumericalError(
@@ -275,14 +332,18 @@ class FittedForecaster:
         ``raw_time`` identifies observed cells; recursive uses instead identify
         ``source_horizon``. Direct context repeats per independent horizon.
         """
-        records = []
+        records: list[tuple[int, str, str, Any, int | None]] = []
         recursive = isinstance(self.strategy, RecursiveForecaster)
         horizons = range(1, max(self.horizons) + 1) if recursive else self.horizons
+        features = self.strategy.features
         for horizon in horizons:
-            for lag, name in zip(
-                self.strategy.features.lags, self.strategy.features.feature_names, strict=True
-            ):
-                position = len(self.data) - 1 + (horizon if recursive else 1) - lag
+            running = len(self.data) + (horizon - 1 if recursive else 0)
+            positions = features.target_positions(running, step=horizon)
+            for position, name in zip(positions, features.feature_names, strict=True):
+                if position is None:
+                    # An exogenous column is supplied, not produced by the forecast.
+                    records.append((horizon, name, "exogenous", None, None))
+                    continue
                 observed = position < len(self.data)
                 records.append(
                     (

@@ -1,7 +1,7 @@
 include LICENSE CITATION.cff CHANGELOG.md CONTRIBUTING.md SECURITY.md mkdocs.yml
-include *.md MANIFEST.json requirements-docs.txt requirements-tested-windows-py312.txt
+include *.md requirements-docs.txt requirements-tested-windows-py312.txt
 exclude coverage.json
-recursive-include docs *.md *.png
+recursive-include docs *.md *.png *.json
 recursive-include examples *.py
 recursive-include scripts *.py
 recursive-include tests *.py

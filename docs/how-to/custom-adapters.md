@@ -50,3 +50,36 @@ Test baseline agreement, nonunit/zero weights, physical row removal with fixed
 Use central differences over several small steps, including forecast propagation,
 before adding an analytic capability. The public adapter surface is development
 API; external scikit-learn, sparse, robust and neural adapters are not shipped.
+
+
+## Add a feature builder
+
+A design builder is a second, separate contract. Any object implementing
+`FeatureBuilder` may be passed as a forecaster's `features`:
+
+```python
+feature_names -> tuple[str, ...]                     # design column order
+min_history   -> int                                 # observations needed before any row
+build(data, horizon) -> DesignMatrix                 # cases plus full provenance
+context_row(values, *, step, data) -> list[float]    # the forecast-context row
+target_positions(n_values, *, step) -> tuple[int | None, ...]
+```
+
+`build` must declare provenance for **every** raw cell it consumes, one row per
+occurrence, with `raw_time`, `role`, `feature`, `variable`, `case_id` and
+`model_key`. Interventions rebuild affected cases from that table, so an
+undeclared cell is an unreported dependency and a correctness bug.
+
+`target_positions` reports, per column, the index into the running value list
+that the column reads from the forecast target, or `None` when it reads
+something else. Recursive forecasting uses those indices to feed predictions
+forward and to propagate derivatives; a column reporting `None` is treated as a
+fixed input, which is correct for data known independently of the forecast.
+
+A builder that also consumes other recorded series should implement
+`MultiSeriesBuilder` as well — `variables`, `exogenous` and
+`replace_values(edits)` — which makes those series' cells addressable as
+observation sources. `ExogenousFeatures` is the reference implementation.
+
+Never consult a value dated after a case's issue time, and never impute a
+missing one. Builders must be deterministic and must copy caller data.

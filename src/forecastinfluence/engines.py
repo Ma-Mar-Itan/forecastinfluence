@@ -11,6 +11,7 @@ import xarray as xr
 
 from .capabilities import validate_capability
 from .core import FloatArray, ForecastInfluenceError, NumericalError, ReplayPolicy
+from .features import MultiSeriesBuilder
 from .forecasting import FittedForecaster
 from .interventions import (
     AddToValues,
@@ -18,6 +19,7 @@ from .interventions import (
     Change,
     Coordinate,
     SetCaseWeight,
+    ShiftCaseWeights,
     Source,
     SourceSelection,
 )
@@ -100,13 +102,66 @@ def observation_catalog(data: Any) -> tuple[Source, ...]:
     )
 
 
+def _selected_baseline(fitted: FittedForecaster, members: tuple[Source, ...]) -> FloatArray:
+    """Return the declared baseline weights of the selected fitted cases."""
+    selected = {s.id for s in members}
+    values = [
+        weight
+        for key, design in fitted.designs.items()
+        for weight, case_id in zip(
+            fitted.baseline_case_weights(key, len(design.case_ids)),
+            design.case_ids,
+            strict=True,
+        )
+        if case_id in selected
+    ]
+    return np.asarray(values, dtype=np.float64) if values else np.ones(len(members))
+
+
+def raw_catalog_for(data: Any, features: Any) -> tuple[Source, ...]:
+    """Return raw cells of the forecast target and of every declared predictor."""
+    sources = list(observation_catalog(data))
+    for variable in getattr(features, "variables", ()):
+        sources.extend(
+            Source(
+                "observation:" + json.dumps([str(t), variable], separators=(",", ":")),
+                "observation",
+                t,
+                variable,
+            )
+            for t in data.index
+        )
+    return tuple(sources)
+
+
+def raw_catalog(fitted: FittedForecaster) -> tuple[Source, ...]:
+    """Return every raw cell a fitted study can intervene on."""
+    return raw_catalog_for(fitted.data, fitted.strategy.features)
+
+
+def known_variables(fitted: FittedForecaster) -> set[str]:
+    """Return the forecast target name plus every declared predictor name."""
+    return {fitted.data.name, *getattr(fitted.strategy.features, "variables", ())}
+
+
+def raw_value(fitted: FittedForecaster, source: Source) -> float:
+    """Return the current recorded value of one raw cell, in any declared series."""
+    if source.variable == fitted.data.name:
+        return float(fitted.data.values[fitted.data.position(source.timestamp)])
+    features = fitted.strategy.features
+    if not isinstance(features, MultiSeriesBuilder):
+        raise ForecastInfluenceError("Source variable does not belong to the fitted data.")
+    return float(features.exogenous.loc[source.timestamp, source.variable])
+
+
 def validate_request(
     fitted: FittedForecaster, request: InfluenceRequest, *, allow_ineligible: bool = False
 ) -> None:
     """Preflight capabilities, source identities, step feasibility and fixed truth."""
-    if not fitted.baseline_is_unit:
+    if not fitted.baseline_is_unit and fitted.baseline_spec is None:
         raise ForecastInfluenceError(
-            "Influence studies require baseline case weights all one; fit an unweighted baseline first."
+            "Influence requires unit baseline case weights or a declared baseline weight rule; "
+            "set forecaster baseline_weights=... instead of passing weights directly."
         )
     validate_capability(
         request.sources.unit,
@@ -120,23 +175,30 @@ def validate_request(
         raise ForecastInfluenceError("on_failure must be 'raise' or 'record'.")
     if not np.isfinite(request.step) or request.step <= 0:
         raise ForecastInfluenceError("Central-difference step must be finite and positive.")
-    if (
-        request.engine == "central_difference"
-        and request.sources.unit == "case"
-        and request.step > 1
-    ):
-        raise ForecastInfluenceError(
-            "Weight central differences require step <= 1 to keep weights nonnegative."
-        )
-    catalog = (
-        source_catalog(fitted)
-        if request.sources.unit == "case"
-        else observation_catalog(fitted.data)
-    )
+    if request.engine == "central_difference" and request.sources.unit == "case":
+        if fitted.baseline_is_unit:
+            if request.step > 1:
+                raise ForecastInfluenceError(
+                    "Weight central differences require step <= 1 to keep weights nonnegative."
+                )
+        else:
+            smallest = min(
+                float(fitted.baseline_case_weights(key, len(design.case_ids)).min())
+                for key, design in fitted.designs.items()
+            )
+            if request.step > smallest:
+                raise ForecastInfluenceError(
+                    "Weight central differences require step <= the smallest baseline weight "
+                    f"({smallest:.6g}) to keep weights nonnegative."
+                )
+    catalog = source_catalog(fitted) if request.sources.unit == "case" else raw_catalog(fitted)
     known = {s.id: s for s in catalog}
+    variables = known_variables(fitted)
     for source in request.sources.members:
-        if source.variable != fitted.data.name or source.unit != request.sources.unit:
+        if source.unit != request.sources.unit or source.variable not in variables:
             raise ForecastInfluenceError("Source variable/unit does not match the fitted data.")
+        if request.sources.unit == "case" and source.variable != fitted.data.name:
+            raise ForecastInfluenceError("Case sources belong to the forecast target series.")
         if source.id in known and source != known[source.id]:
             raise ForecastInfluenceError("Source identifier and membership metadata disagree.")
         if source.id not in known and not allow_ineligible:
@@ -149,11 +211,9 @@ def validate_request(
             if status != "ok":
                 continue
             coordinates = (
-                np.ones(len(active))
+                _selected_baseline(fitted, active)
                 if request.sources.unit == "case"
-                else np.array(
-                    [fitted.data.values[fitted.data.position(s.timestamp)] for s in active]
-                )
+                else np.array([raw_value(fitted, s) for s in active])
             )
             with np.errstate(over="ignore"):
                 plus, minus = coordinates + request.step, coordinates - request.step
@@ -241,7 +301,7 @@ def _availability(
     known = (
         {s.id for s in source_catalog(fitted)}
         if members[0].unit == "case"
-        else {s.id for s in observation_catalog(fitted.data)}
+        else {s.id for s in raw_catalog(fitted)}
     )
     active = tuple(s for s in members if s.id in known)
     return active, "ok" if active else "structural_zero"
@@ -280,7 +340,8 @@ def _model_spec(fitted: FittedForecaster) -> dict[str, Any]:
     return {
         "adapter": type(fitted.strategy.regressor).__qualname__,
         "strategy": fitted.strategy.kind,
-        "lags": list(fitted.strategy.features.lags),
+        "features": list(fitted.strategy.features.feature_names),
+        "lags": list(getattr(fitted.strategy.features, "lags", ())),
         "objectives": {str(k): asdict(m.objective) for k, m in fitted.models.items()},
         "parameters": {str(k): m.parameters.tolist() for k, m in fitted.models.items()},
         "solver": {str(k): _json(m.diagnostics) for k, m in fitted.models.items()},
@@ -341,12 +402,12 @@ def compute(
                 }
             else:
                 plus_change: Change = (
-                    SetCaseWeight(1 + request.step)
+                    ShiftCaseWeights(request.step)
                     if isinstance(request.intervention, CaseWeight)
                     else AddToValues(request.step)
                 )
                 minus_change: Change = (
-                    SetCaseWeight(1 - request.step)
+                    ShiftCaseWeights(-request.step)
                     if isinstance(request.intervention, CaseWeight)
                     else AddToValues(-request.step)
                 )
@@ -434,6 +495,9 @@ def compute(
     truth = (
         _json(request.target.truth.to_dict()) if isinstance(request.target, SquaredError) else None
     )
+    baseline_spec = (
+        {"kind": "unit"} if fitted.baseline_spec is None else _json(fitted.baseline_spec.spec)
+    )
     scientific = {
         "data": fitted.data.fingerprint,
         "model": model_spec,
@@ -441,6 +505,7 @@ def compute(
         "target": request.target.kind,
         "truth": truth,
         "horizons": fitted.horizons,
+        "baseline_weights": baseline_spec,
     }
     fingerprint = sha256(json.dumps(scientific, sort_keys=True).encode()).hexdigest()
     metadata = ResultMetadata(
@@ -463,6 +528,7 @@ def compute(
             "actual_refits": actual_fits,
             "refit_count_convention": "successful final and tuning fits; partial fits inside failed replays excluded",
             "step": request.step if request.engine == "central_difference" else None,
+            "baseline_weights": baseline_spec,
             "versions": {
                 "numpy": np.__version__,
                 "pandas": pd.__version__,
@@ -478,5 +544,6 @@ def compute(
         },
         origins=[str(origin)],
         window=window or {"start": str(fitted.data.index[0]), "length": len(fitted.data)},
+        baseline_weights="all_one" if fitted.baseline_is_unit else str(baseline_spec),
     )
     return result_cls(xr.Dataset(variables, coords=coords), metadata)

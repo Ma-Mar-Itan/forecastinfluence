@@ -18,6 +18,7 @@ data and imports no other example module.
 | `python examples/multivariate.py` | Vector recurrence, raw-cell effects and rolling target axes. |
 | `python examples/research_simulations.py` | Paired contamination and matched research diagnostics. |
 | `python examples/pipeline_replay.py` | Chronological tuning with explicit frozen/refit policy contrast. |
+| `python examples/exogenous_and_decay.py` | Exogenous design columns, decayed baseline weights, per-series raw edits and derivative validation. |
 | `python examples/deletion_roles_intervals.py` | Separate deletion semantics, additive local role paths and conditional interval effects. |
 
 Run `python scripts/check_readme_examples.py --run` to verify README/script

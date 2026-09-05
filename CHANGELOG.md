@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+- Added `ExogenousFeatures`: target lags plus declared lagged columns of other
+  recorded series, aligned by label, with per-series provenance. Case weights,
+  case deletion and raw value edits work on any declared series; a raw edit to
+  one series never disturbs another sharing its timestamp. Direct strategies
+  only, and excluding an exogenous cell is refused.
+- Generalized the design builder into the documented `FeatureBuilder` protocol
+  and moved lag-specific forecast, context and chain-rule logic behind it. The
+  builder is no longer restricted to `LagFeatures`. Role decomposition and
+  recursive innovation intervals stay lag-only and now refuse other builders
+  explicitly.
+- Added declared baseline case weights (`UnitWeights`, `ExponentialDecay`).
+  Derivatives are taken at the declared baseline and central differences step
+  around it; every replay reapplies the rule, including inside rolling windows.
+  Weight arrays supplied directly to a forecaster still refuse influence.
+- Provenance gained a `variable` column, so dependent-row selection matches on
+  series as well as timestamp.
+- Result metadata and the comparison fingerprint now record the baseline weight
+  rule, so results fitted under different rules are not silently comparable.
+- Moved superseded planning documents from the repository root into
+  `docs/project/archive/`, excluded from the built site; grouped v0.1 history in
+  the documentation navigation. No published behaviour changed.
+- Verified on Python 3.11, 3.12 and 3.13 on Linux, in addition to the previously
+  recorded Windows/3.12 run.
+
 ## 1.0.0 — local distribution, 2026-09-05
 
 - Independently audited v0.1 and corrected collapsed perturbations, nonfinite

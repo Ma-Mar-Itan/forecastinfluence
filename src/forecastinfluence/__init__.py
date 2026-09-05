@@ -12,7 +12,7 @@ from .data import SeriesData
 from .datasets import DATASET_NAMES, dataset_info, load_dataset
 from .diagnostics import ValidationReport, compare, finite_interaction
 from .engines import InfluenceRequest
-from .features import LagFeatures
+from .features import ExogenousFeatures, FeatureBuilder, LagFeatures
 from .forecasting import DirectForecaster, RecursiveForecaster
 from .interventions import (
     AddToValues,
@@ -61,10 +61,16 @@ from .sparse import ElasticNetRegressor, LassoRegressor
 from .study import InfluenceStudy, RawObservationWindow, RollingInfluenceStudy
 from .targets import ForecastValue, ParameterValue, SquaredError
 from .uncertainty import IntervalValue, forecast_intervals
+from .weights import BaselineWeights, ExponentialDecay, UnitWeights
 
 __version__ = "1.0.0"
 
 __all__ = [
+    "BaselineWeights",
+    "ExogenousFeatures",
+    "FeatureBuilder",
+    "ExponentialDecay",
+    "UnitWeights",
     "DATASET_NAMES",
     "dataset_info",
     "load_dataset",

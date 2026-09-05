@@ -11,7 +11,14 @@ import xarray as xr
 from .core import ForecastInfluenceError, ReplayPolicy
 from .data import SeriesData
 from .diagnostics import ValidationReport, compare
-from .engines import InfluenceRequest, compute, observation_catalog, plan_request, source_catalog
+from .engines import (
+    InfluenceRequest,
+    compute,
+    plan_request,
+    raw_catalog,
+    raw_catalog_for,
+    source_catalog,
+)
 from .forecasting import DirectForecaster, FittedForecaster, RecursiveForecaster
 from .interventions import CaseWeight, Change, Coordinate, RawValue, SourceCatalog, SourceSelection
 from .planning import RunPlan, make_plan
@@ -90,7 +97,7 @@ class InfluenceStudy:
         if unit not in {"case", "observation"}:
             raise ForecastInfluenceError("unit must be 'case' or 'observation'.")
         return SourceCatalog(
-            source_catalog(self.fitted) if unit == "case" else observation_catalog(self.fitted.data)
+            source_catalog(self.fitted) if unit == "case" else raw_catalog(self.fitted)
         )
 
     def local(
@@ -317,7 +324,7 @@ class RollingInfluenceStudy:
     def sources(self, *, unit: str) -> SourceCatalog:
         """Return a union catalog without fitting, including unobserved raw labels."""
         if unit == "observation":
-            return SourceCatalog(observation_catalog(self.data))
+            return SourceCatalog(raw_catalog_for(self.data, self.forecaster.features))
         if unit != "case":
             raise ForecastInfluenceError("unit must be 'case' or 'observation'.")
         from .interventions import Source
@@ -351,7 +358,7 @@ class RollingInfluenceStudy:
             raise ForecastInfluenceError("Unknown source in rolling catalog.")
         models = len(self.horizons) if self.forecaster.kind == "direct" else 1
         if isinstance(request.target, ParameterValue):
-            n_parameters = len(self.forecaster.features.lags) + int(
+            n_parameters = len(self.forecaster.features.feature_names) + int(
                 self.forecaster.regressor.fit_intercept
             )
             tail = (models, n_parameters)
@@ -376,7 +383,7 @@ class RollingInfluenceStudy:
         for origin in self.origins:
             data = self.data.window(origin, length=self.window.length, start=self.window.start)
             if request.sources.unit == "observation":
-                active_ids = {s.id for s in observation_catalog(data)}
+                active_ids = {s.id for s in raw_catalog_for(data, self.forecaster.features)}
             else:
                 keys = self.horizons if self.forecaster.kind == "direct" else (1,)
                 active_ids = {

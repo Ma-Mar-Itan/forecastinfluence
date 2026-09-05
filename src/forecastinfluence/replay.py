@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from .core import ForecastInfluenceError, ReplayPolicy, UnsupportedCapabilityError
-from .features import DesignMatrix
+from .features import DesignMatrix, MultiSeriesBuilder
 from .forecasting import FittedForecaster
 from .interventions import (
     AddToValues,
@@ -15,6 +15,7 @@ from .interventions import (
     DeleteCases,
     DeleteObservations,
     SetCaseWeight,
+    ShiftCaseWeights,
     Source,
 )
 
@@ -44,9 +45,19 @@ def replay(
     if not procedure and (policy.preprocessing == "refit" or policy.hyperparameters == "retune"):
         raise UnsupportedCapabilityError("Refit preprocessing/retuning requires PipelineRegressor.")
     data = fitted.data
+    strategy = fitted.strategy
     selected = {source.id for source in members}
-    raw_times = {source.timestamp for source in members}
-    if isinstance(change, DeleteObservations):
+    target_name = fitted.data.name
+    raw_times = {source.timestamp for source in members if source.variable == target_name}
+    exogenous_members = [source for source in members if source.variable != target_name]
+    if isinstance(change, ShiftCaseWeights):
+        pass
+    elif isinstance(change, DeleteObservations):
+        if exogenous_members:
+            raise UnsupportedCapabilityError(
+                "Excluding an exogenous cell is not supported; its dependent-row and "
+                "forecast-context semantics are undeclared. Use ReplaceValues or AddToValues."
+            )
         context = fitted.context_provenance
         if policy.context != "fixed" and context.raw_time.isin(raw_times).any():
             raise ForecastInfluenceError(
@@ -58,19 +69,42 @@ def replay(
             if isinstance(change, AddToValues)
             else change.value
             for s in members
+            if s.variable == target_name
         }
-        data = data.replace_values(edits)
+        if edits:
+            data = data.replace_values(edits)
+        if exogenous_members:
+            if not isinstance(strategy.features, MultiSeriesBuilder):
+                raise ForecastInfluenceError("Builder declares no series beyond the target.")
+            frame = strategy.features.exogenous
+            outside = {
+                (s.timestamp, s.variable): (
+                    float(frame.loc[s.timestamp, s.variable]) + change.delta
+                    if isinstance(change, AddToValues)
+                    else change.value
+                )
+                for s in exogenous_members
+            }
+            strategy = replace(strategy, features=strategy.features.replace_values(outside))
     designs, models = {}, {}
     for key, original in fitted.designs.items():
-        design = fitted.strategy.features.build(data, key)
-        weights = np.ones(len(design.case_ids))
+        design = strategy.features.build(data, key)
+        weights = fitted.baseline_case_weights(key, len(design.case_ids))
         if isinstance(change, SetCaseWeight):
             weights[[s in selected for s in design.case_ids]] = change.value
+        elif isinstance(change, ShiftCaseWeights):
+            chosen = np.array([s in selected for s in design.case_ids])
+            weights[chosen] = weights[chosen] + change.delta
+            if np.any(weights < 0):
+                raise ForecastInfluenceError(
+                    "Central-difference step drives a baseline weight negative; use a smaller step."
+                )
         elif isinstance(change, (DeleteCases, DeleteObservations)):
             dropped = selected
             if isinstance(change, DeleteObservations):
                 provenance = design.provenance
-                dropped = set(provenance.loc[provenance.raw_time.isin(raw_times), "case_id"])
+                touched = provenance.raw_time.isin(raw_times) & (provenance.variable == target_name)
+                dropped = set(provenance.loc[touched, "case_id"])
                 if dropped and change.missing_policy == "error":
                     raise ForecastInfluenceError(
                         "Raw exclusion invalidates training rows; choose drop_affected_rows explicitly."
@@ -97,6 +131,7 @@ def replay(
     return replace(
         fitted,
         data=data,
+        strategy=strategy,
         _models=MappingProxyType(models),
         _designs=MappingProxyType(designs),
         baseline_is_unit=False,

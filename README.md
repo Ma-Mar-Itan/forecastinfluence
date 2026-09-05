@@ -3,9 +3,10 @@
 Observation-influence studies for forecasting, with explicit interventions,
 horizon-resolved results, and numerical reference checks.
 
-**Version 1.0.0.** A local, typed research package by **Malek Itani**, licensed
-under MIT for anyone to use. Verified with **442 passing tests and 96.88% coverage**,
-including the complete tests and 12 examples against a clean installed wheel.
+**Version 1.0.0, plus unreleased additions** (see [CHANGELOG](CHANGELOG.md)).
+A local, typed research package by **Malek Itani**, licensed
+under MIT for anyone to use. Verified with **477 passing tests and 96.39% coverage**,
+including the complete tests and 13 examples against a clean installed wheel.
 Source code is available at [github.com/Ma-Mar-Itan/ForecastInfluence](https://github.com/Ma-Mar-Itan/ForecastInfluence).
 No PyPI package upload or hosted documentation site is claimed. See the
 [v1 handoff](docs/project/handoff_v100.md) and [release checklist](docs/project/release_checklist_v100.md).
@@ -32,9 +33,10 @@ For sparse/Huber models add `python -m pip install -e ".[models]"`; for plotting
 add `python -m pip install -e ".[plots]"`. Base imports require
 NumPy, pandas and xarray; Matplotlib is loaded only when plotting is requested.
 No model download, service account or network dataset is needed by the examples.
-The declared Python minimum is 3.11. The examples were executed locally with
-Python 3.12 on Windows; the checked-in CI matrix covers Python 3.11, 3.12 and 3.13 on
-Linux, Windows and macOS, but its presence is not evidence of completed remote runs.
+The declared Python minimum is 3.11. The full suite has been executed on Python
+3.12 on Windows and on Python 3.11, 3.12 and 3.13 on Linux, including under a
+different NumPy minor version. The checked-in CI matrix also covers Windows and
+macOS runners, but its presence is not evidence of completed remote runs.
 
 ## A complete study
 
@@ -124,6 +126,12 @@ pickling models or embedding the original raw series.
 
 Additional implemented workflows:
 
+- **Exogenous designs:** target lags plus declared lagged columns of other recorded
+  series, aligned by label, with per-series provenance so an edit to one series never
+  disturbs another sharing its timestamp. Direct strategies only.
+- **Declared baseline weights:** unit weights, or a rule such as normalized exponential
+  decay. Derivatives are taken at the declared baseline and every replay reapplies the
+  rule; ad-hoc weight arrays still refuse influence.
 - **Sparse and robust models:** LASSO, elastic net and fixed-scale Huber; explicit
   objective normalization, solver diagnostics, selected features and support paths.
 - **Deletion and roles:** physical case removal versus raw exclusion with a declared
