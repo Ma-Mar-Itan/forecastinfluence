@@ -1,0 +1,34 @@
+{
+  "name": "var",
+  "source": "original synthetic data",
+  "license": "MIT",
+  "author": "Malek Itani",
+  "seed": 7,
+  "index_kind": "integer",
+  "n": 96,
+  "generation_metadata": {
+    "source": "ForecastInfluence synthetic VAR generator",
+    "license": "MIT",
+    "seed": 7,
+    "coefficients": [
+      [
+        [
+          0.55,
+          0.15
+        ],
+        [
+          -0.1,
+          0.45
+        ]
+      ]
+    ],
+    "spectral_radius": 0.51234753829798,
+    "burn_in": 200,
+    "frequency": "unit integer grid",
+    "targets": [
+      "variable_0",
+      "variable_1"
+    ]
+  },
+  "interpretation": "Synthetic fixture, not real measurements or evidence of model performance."
+}

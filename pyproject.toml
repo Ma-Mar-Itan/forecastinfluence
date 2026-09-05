@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forecastinfluence"
+version = "1.0.0"
+description = "Intervention-explicit observation influence for forecasting"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "Malek Itani"}]
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "pandas>=2.1", "xarray>=2024.1"]
+classifiers = ["Development Status :: 5 - Production/Stable", "Topic :: Scientific/Engineering"]
+
+[project.urls]
+Homepage = "https://github.com/Ma-Mar-Itan/ForecastInfluence"
+Repository = "https://github.com/Ma-Mar-Itan/ForecastInfluence"
+Issues = "https://github.com/Ma-Mar-Itan/ForecastInfluence/issues"
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.8"]
+models = ["scikit-learn>=1.5", "scipy>=1.12"]
+parquet = ["pyarrow>=14"]
+dev = ["pytest>=8", "pytest-cov>=5", "hypothesis>=6", "ruff>=0.9", "mypy>=1.14", "pandas-stubs>=2.1", "build>=1.2", "twine>=6"]
+docs = ["mkdocs-material>=9.5,<10", "mkdocstrings[python]>=0.28", "mkdocs>=1.6,<2"]
+
+[project.scripts]
+forecastinfluence = "forecastinfluence.experiments.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+forecastinfluence = ["py.typed", "datasets/*.csv", "datasets/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["numerical: independent numerical oracles", "temporal: temporal semantics", "integration: public workflows", "slow: optional larger runs"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_unused_ignores = true
+
+[tool.coverage.run]
+branch = true
+source = ["forecastinfluence"]
+
+[tool.coverage.report]
+show_missing = true

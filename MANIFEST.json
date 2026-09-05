@@ -1,0 +1,68 @@
+{
+  "project": "ForecastInfluence",
+  "artifact_type": "implementation_handoff",
+  "prepared_date": "2026-09-05",
+  "initial_delivery_target": "v0.1",
+  "documents": [
+    {
+      "file": "START_HERE.md",
+      "purpose": "Start here",
+      "words": 554,
+      "sha256": "7496a2bf4b324dc0632e9dd6142e7d21774699c84e95815adcb3be799dead97b"
+    },
+    {
+      "file": "ASTRA_MASTER_PROMPT.md",
+      "purpose": "Master prompt for Astra",
+      "words": 1489,
+      "sha256": "1e143b63de4ec1d87a4faa6cb45c79d647cf33bc12e486b5327a58fc16857168"
+    },
+    {
+      "file": "PROJECT_SPEC.md",
+      "purpose": "Product and release specification",
+      "words": 1596,
+      "sha256": "854e7e207945bc6a816be90dce43dfe4ff787247020f6a0cf28d1dd7628d5a74"
+    },
+    {
+      "file": "STATISTICAL_CONTRACT.md",
+      "purpose": "Statistical contract",
+      "words": 2489,
+      "sha256": "2b5e44f8e7bac989233af642f60bc8b2c733b846b31106cfb6c55cb768651576"
+    },
+    {
+      "file": "ARCHITECTURE_AND_API.md",
+      "purpose": "Modular architecture and proposed API",
+      "words": 2275,
+      "sha256": "1eea45a5d86eda1507be55e3e402143dba7d6d775af19adcc5ecedc2e32f7d8d"
+    },
+    {
+      "file": "IMPLEMENTATION_PLAN.md",
+      "purpose": "Dependency-ordered implementation plan",
+      "words": 1811,
+      "sha256": "39fb43c567080038f94683acbac55927e21ad8d3fa732682bdda8bda0737e757"
+    },
+    {
+      "file": "TESTING_AND_BENCHMARKS.md",
+      "purpose": "Testing and research benchmarks",
+      "words": 2212,
+      "sha256": "f1d7cf2b0eeed38a8733a547ba144e1dabd852f26a78fa9dab191d88ee3503e1"
+    },
+    {
+      "file": "README_AND_DOCUMENTATION.md",
+      "purpose": "README and documentation specification",
+      "words": 1697,
+      "sha256": "638b6d8a1e0360239c79054d1eb52b86c2fba4f6ebc8f95848c959c2b75659b4"
+    },
+    {
+      "file": "REFERENCE_README.md",
+      "purpose": "Reference README",
+      "words": 892,
+      "sha256": "83d990834ee80f57733dfb3c7ee786b00dd31652b411cdc5f1052b71a212d10c"
+    },
+    {
+      "file": "RESEARCH_POSITIONING.md",
+      "purpose": "Research positioning and references",
+      "words": 1220,
+      "sha256": "75dfeb148520985e91bf9a29cfd6ee50b9f6114f73ea4af9fa95cd7625f1e0d1"
+    }
+  ]
+}

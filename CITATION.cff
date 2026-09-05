@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using this metadata. Local software distribution; no published DOI is claimed."
+title: ForecastInfluence
+type: software
+version: 1.0.0
+authors:
+  - family-names: Itani
+    given-names: Malek
+license: MIT
+abstract: "Intervention-explicit observation-influence studies in forecasting with numerical reference checks."
+repository-code: "https://github.com/Ma-Mar-Itan/ForecastInfluence"

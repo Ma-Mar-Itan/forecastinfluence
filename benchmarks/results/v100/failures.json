@@ -1,0 +1,9 @@
+[
+  {
+    "experiment": "performance",
+    "n": 100,
+    "p": 200,
+    "model": "ols",
+    "error": "nonunique OLS: n <= p"
+  }
+]

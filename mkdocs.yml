@@ -1,0 +1,87 @@
+site_name: ForecastInfluence
+site_description: Explicit intervention studies for forecasting
+strict: true
+theme:
+  name: material
+  font: false
+  palette:
+    scheme: default
+    primary: blue grey
+    accent: teal
+  features:
+    - navigation.sections
+    - content.code.copy
+    - search.suggest
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+nav:
+  - Home: index.md
+  - Get started: tutorials/quickstart.md
+  - Tutorials:
+      - Cases, raw edits and groups: tutorials/interventions.md
+      - Rolling studies and validation: tutorials/rolling-and-validation.md
+  - How-to:
+      - Sparse models and selection: guides/sparse_models.md
+      - Robust regression: guides/robust_models.md
+      - Pipeline replay and tuning: guides/pipeline_replay.md
+      - Deletion and role paths: guides/deletion_roles.md
+      - Conditional uncertainty: guides/uncertainty.md
+      - Multivariate and rolling VAR: guides/multivariate.md
+      - Results and diagnostics: guides/results_diagnostics.md
+      - Data, targets and replay: how-to/data-and-policies.md
+      - Results, export and budgets: how-to/results-and-resources.md
+      - Custom adapters: how-to/custom-adapters.md
+  - Explanations:
+      - Statistical meaning: explanations/statistical-contract.md
+      - Temporal and numerical assumptions: explanations/temporal-and-numerical.md
+  - Reference:
+      - v1 API additions: reference/v100.md
+      - Public API: reference/api.md
+      - Native models: reference/models.md
+      - Forecast construction: reference/forecasting.md
+  - Examples: examples/gallery.md
+  - Research:
+      - Literature: research/literature.md
+      - Reproducible experiments: research/experiments.md
+      - Paper outline: research/paper_outline.md
+      - Related work: research/related-work.md
+      - Claims register: research/novelty-claims.md
+  - Contributing: contributing/development.md
+  - Project:
+      - v1 release checklist: project/release_checklist_v100.md
+      - v1 handoff: project/handoff_v100.md
+      - v1 architecture: project/v100_architecture.md
+      - Migration: project/migration_v010_to_v100.md
+      - Independent v0.1 audit: project/v010_audit.md
+      - v0.1 numerical audit: project/v010_numerical_audit.md
+      - Independent v1 review: project/v100_numerical_review.md
+      - Status: project/status.md
+      - Implementation handoff: project/handoff.md
+      - Verification evidence: project/verification.md
+      - Implementation plan: project/implementation-plan.md
+      - Numerical review: project/numerical-review.md
+      - Shared contracts: project/decisions/0001-contracts.md
+      - Environment and release: project/decisions/0002-environment-and-release.md

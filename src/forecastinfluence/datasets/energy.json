@@ -1,0 +1,18 @@
+{
+  "name": "energy",
+  "source": "original synthetic data",
+  "license": "MIT",
+  "author": "Malek Itani",
+  "seed": 7,
+  "index_kind": "datetime",
+  "n": 168,
+  "generation_metadata": {
+    "source": "ForecastInfluence analytic synthetic generator",
+    "license": "MIT",
+    "seed": 7,
+    "frequency": "hourly timezone-naive",
+    "units": "synthetic demand units",
+    "target": "synthetic_demand"
+  },
+  "interpretation": "Synthetic fixture, not real measurements or evidence of model performance."
+}

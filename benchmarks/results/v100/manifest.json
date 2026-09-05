@@ -1,0 +1,15 @@
+{
+  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "seed": 7,
+  "threads": 1,
+  "allocation_metric": "tracemalloc Python-tracked peak; not total process memory",
+  "versions": {
+    "forecastinfluence": "1.0.0",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.0"
+  },
+  "source_sha256": "6f1d977c3005a9368993c4b0b661ad70dc92760d54e43d9addc29f6b2ac9473f"
+}
